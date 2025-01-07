@@ -8,11 +8,14 @@ import numpy as np
 from flask import Flask, request, jsonify, send_from_directory
 from botocore.exceptions import NoCredentialsError
 from serpapi import GoogleSearch
-from sklearn.cluster import KMeans
 import base64
+from flask_cors import CORS
 
 # Initialize Flask app
 app = Flask(__name__)
+
+# Initialize CORS
+CORS(app)
 
 # Initialize Google Vision client
 client = vision.ImageAnnotatorClient()
@@ -22,26 +25,6 @@ s3_client = boto3.client('s3')
 
 # Set your S3 bucket name
 S3_BUCKET_NAME = 'fashionwebapp'
-
-# Function to get the dominant color from an image
-def get_dominant_color(image):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    pixels = image.reshape(-1, 3)
-    kmeans = KMeans(n_clusters=1, random_state=42, n_init=10)
-    kmeans.fit(pixels)
-    dominant_color = kmeans.cluster_centers_[0]
-    dominant_color = dominant_color.round().astype(int)
-    return tuple(dominant_color)
-
-# Function to get the closest color name from TheColorAPI
-def get_color_name(rgb):
-    url = "https://www.thecolorapi.com/id"
-    response = requests.get(url, params={'rgb': f'rgb({rgb[0]},{rgb[1]},{rgb[2]})'})
-    if response.status_code == 200:
-        color_data = response.json()
-        color_name = color_data['name']['value']
-        return color_name
-    return None
 
 # Function to upload an image to AWS S3
 def upload_to_s3(image, filename):
@@ -94,19 +77,42 @@ def get_clothing_from_google_search(image_url):
     except Exception as e:
         return {"error": str(e)}
 
-# Default route to serve the frontend
-@app.route('/')
-def index():
-    return send_from_directory('static', 'index.html')
+# Function to get dominant color
+def get_dominant_color(image):
+    # Convert image to RGB if it's not
+    if len(image.shape) == 3 and image.shape[2] == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Reshape the image to be a list of pixels
+    pixels = image.reshape((-1, 3))
 
-# Route to handle image upload and analysis
+    # Convert to float
+    pixels = np.float32(pixels)
+
+    # Define criteria
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 200, .1)
+    flags = cv2.KMEANS_RANDOM_CENTERS
+
+    # Perform k-means clustering
+    _, labels, palette = cv2.kmeans(pixels, 1, None, criteria, 10, flags)
+
+    # Convert back to 8 bit values
+    palette = np.uint8(palette)
+
+    # Return the dominant color
+    return palette[0].tolist()
+
+@app.route('/')
+def home():
+    return "Fashion Analyzer API is running!"
+
 @app.route('/upload', methods=['POST'])
 def upload_image():
     if 'image' not in request.files:
         return jsonify({'error': 'No image file provided'}), 400
     
     image_file = request.files['image']
-    image_filename = image_file.filename  # Get the filename from the file object
+    image_filename = image_file.filename
     image_path = os.path.join('uploads', image_filename)
 
     # Save the uploaded image
@@ -141,14 +147,11 @@ def upload_image():
             cropped_region = img[y_min:y_max, x_min:x_max]
             dominant_color = get_dominant_color(cropped_region)
 
-            # Get the color name
-            color_name = get_color_name(dominant_color)
-
             # Draw bounding boxes and labels
             dominant_color_bgr = (int(dominant_color[2]), int(dominant_color[1]), int(dominant_color[0]))
             cv2.polylines(annotated_image, [np.array(vertices)], isClosed=True, color=dominant_color_bgr, thickness=2)
             label = obj.name
-            cv2.putText(annotated_image, f"{label} - {color_name}", (vertices[0][0], vertices[0][1] - 10),
+            cv2.putText(annotated_image, f"{label} - {dominant_color}", (vertices[0][0], vertices[0][1] - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, dominant_color_bgr, 2)
 
             # Save the bounding box as a separate image
@@ -163,7 +166,7 @@ def upload_image():
                 # Append component data
                 components.append({
                     'name': label,
-                    'dominant_color': color_name,
+                    'dominant_color': dominant_color,
                     'image_url': image_url,
                     'clothing_items': clothing_items
                 })
@@ -179,7 +182,6 @@ def upload_image():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 if __name__ == '__main__':
     # Ensure required directories exist
