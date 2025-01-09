@@ -9,27 +9,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Create a new FormData to send the image to the backend
     const backendFormData = new FormData()
     backendFormData.append('image', image)
 
-    // Send the image to the backend for processing (replace with your backend URL)
     const response = await fetch('http://127.0.0.1:5000/upload', {
       method: 'POST',
       body: backendFormData,
     })
 
-    // Check if the response is successful
     if (!response.ok) {
       throw new Error('Failed to process the image')
     }
 
     const data = await response.json()
-
-    // Return the processed data from the backend
     return NextResponse.json(data)
   } catch (error) {
     console.error('Error processing image:', error)
     return NextResponse.json({ error: 'Error processing image' }, { status: 500 })
   }
 }
+

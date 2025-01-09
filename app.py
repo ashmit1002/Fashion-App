@@ -53,7 +53,7 @@ def get_clothing_from_google_search(image_url):
     params = {
         "engine": "google_lens",
         "url": image_url,
-        "api_key": "ef1060959fb01ad0a7d0000ed737a785872acf6d6b17b12ee71ef7b575e88999"
+        "api_key": "deae6ab4df4abad6bf8312e325fb656a58a2056252a27d8b9164219233e3d5bf"
     }
 
     try:

@@ -1,12 +1,29 @@
 'use client'
 
-import { useResults } from '/Users/ashmi/Downloads/Coding/Fahion App/fashion-analyzer/contexts/ResultsContext'
 import Image from 'next/image'
 import { Card, CardContent } from '@/components/ui/card'
 
-export default function ResultsDisplay() {
-  const { results } = useResults()  // Get the results from the global state
+interface ClothingItem {
+  thumbnail: string
+  price: string
+  link: string
+}
 
+interface Component {
+  name: string
+  clothing_items: ClothingItem[]
+}
+
+interface ResultsData {
+  annotated_image_base64: string
+  components: Component[]
+}
+
+interface ResultsDisplayProps {
+  results: ResultsData | null
+}
+
+export default function ResultsDisplay({ results }: ResultsDisplayProps) {
   if (!results) {
     return null
   }
@@ -61,3 +78,4 @@ export default function ResultsDisplay() {
     </div>
   )
 }
+
