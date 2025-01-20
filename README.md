@@ -1,4 +1,3 @@
-# fashion2.0
-# fashion2.0
-# Fashion-App
-# Fashion-App
+Fashion-App
+Outdated copy
+Awaiting GitHub update
